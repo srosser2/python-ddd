@@ -1,24 +1,37 @@
-def add_numbers(a: int, b: int) -> int:
-    """Function to add two numbers."""
-    return a + b
+from dataclasses import dataclass
+from datetime import date
+from typing import Optional
 
-class Product:
-    def __init__(self, sku):
-        self.sku = sku
+@dataclass(frozen=True)
+class OrderLine:
+    sku: str
+    quantity: int
 
+@dataclass
 class Order:
-    def __init__(self, order_reference, order_lines):
-        self.order_reference = order_reference
-        self.order_lines = order_lines
+    order_reference: str
+    order_lines: list[OrderLine]
 
 class Batch:
-    def __init__(self, reference, sku, quantity) -> None:
+    def __init__(self, reference: str, sku: str, quantity: int, eta: Optional[date] = None) -> None:
         self.reference = reference
         self.sku = sku
         self.quantity = quantity
+        self.eta = eta
+        self._purchased_quantity = quantity
+        self._allocations = set()
 
-    def allocate_order(self, quantity):
-        if self.quantity < quantity:
-            raise Exception("Insufficient quantity")
-        self.quantity -= quantity
-        return Order('Ref', [{ 'sku': self.sku, 'quantity': quantity }])
+    def can_allocate(self, order_line: OrderLine) -> bool:
+        return self.sku == order_line.sku and self.quantity >= order_line.quantity
+
+    def allocate(self, order_line: OrderLine) -> None:
+        if self.can_allocate(order_line):
+            self._allocations.add(order_line)
+
+    @property
+    def get_allocated_quantity(self) -> int:
+        return sum(order_line.quantity for order_line in self._allocations)
+    
+    @property
+    def get_available_quantity(self) -> int:
+        return self.quantity - self.get_allocated_quantity
