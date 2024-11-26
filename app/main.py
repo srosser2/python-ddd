@@ -4,6 +4,7 @@ from typing import Optional
 
 @dataclass(frozen=True)
 class OrderLine:
+    order_id: str
     sku: str
     quantity: int
 
@@ -13,7 +14,7 @@ class Order:
     order_lines: list[OrderLine]
 
 class Batch:
-    def __init__(self, reference: str, sku: str, quantity: int, eta: Optional[date] = None) -> None:
+    def __init__(self, reference: str, sku: str, quantity: int, eta: Optional[date]) -> None:
         self.reference = reference
         self.sku = sku
         self.quantity = quantity
@@ -35,3 +36,22 @@ class Batch:
     @property
     def get_available_quantity(self) -> int:
         return self.quantity - self.get_allocated_quantity
+
+    def __gt__(self, other):
+        if self.eta is None:
+            return False
+        if other.eta is None:
+            return True
+        return self.eta > other.eta
+
+class OutOfStock(Exception):
+    pass
+
+def allocate(line, batches: list[Batch]) -> str:
+    try:
+        batch = next(b for b in sorted(batches) if b.can_allocate(line))
+        batch.allocate(line)
+        return batch.reference
+
+    except StopIteration:
+        raise OutOfStock(f"Out of stock for sku {line.sku}")
